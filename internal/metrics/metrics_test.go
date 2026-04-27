@@ -49,6 +49,22 @@ func TestPrint_ZeroLastMessage(t *testing.T) {
 	}
 }
 
+func TestPrint_CounterValues(t *testing.T) {
+	var buf bytes.Buffer
+	p := metrics.NewWithWriter(&buf)
+
+	if err := p.Print(snapshot(42, 17, 8, 3, time.Now())); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	for _, val := range []string{"42", "17", "8", "3"} {
+		if !strings.Contains(out, val) {
+			t.Errorf("expected output to contain value %q, got:\n%s", val, out)
+		}
+	}
+}
+
 func TestPrintDelta_ContainsRateColumn(t *testing.T) {
 	var buf bytes.Buffer
 	p := metrics.NewWithWriter(&buf)
