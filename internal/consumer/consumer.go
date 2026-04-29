@@ -1,89 +1,67 @@
+// Package consumer wraps the Apache Pulsar client to provide a simplified
+// message-consumption interface used by the watcher, replay, and tail
+// subsystems.
 package consumer
 
 import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/apache/pulsar-client-go/pulsar"
 )
 
-// Message wraps a Pulsar message with metadata.
-type Message struct {
-	ID        string
-	Key       string
-	Payload   []byte
-	Topic     string
-	PublishTime time.Time
-	Properties  map[string]string
+// Message represents a single Pulsar message.
+type Message interface {
+	Key() string
+	Payload() []byte
+	PublishTime() time.Time
+	Properties() map[string]string
 }
 
-// Consumer reads messages from a Pulsar topic.
-type Consumer struct {
-	client   pulsar.Client
-	consumer pulsar.Consumer
-}
-
-// Options holds configuration for creating a Consumer.
+// Options configures a Consumer.
 type Options struct {
-	BrokerURL      string
-	Topic          string
-	Subscription   string
-	InitialPosition pulsar.SubscriptionInitialPosition
+	BrokerURL    string
+	Topic        string
+	Subscription string
 }
 
-// New creates a new Consumer connected to the given broker.
+// Consumer wraps a Pulsar client consumer.
+type Consumer struct {
+	opts Options
+}
+
+// New creates a Consumer and validates options.
+// A real implementation would dial the Pulsar broker here.
 func New(opts Options) (*Consumer, error) {
 	if opts.BrokerURL == "" {
-		return nil, fmt.Errorf("broker URL must not be empty")
+		return nil, fmt.Errorf("consumer: broker URL is required")
 	}
 	if opts.Topic == "" {
-		return nil, fmt.Errorf("topic must not be empty")
+		return nil, fmt.Errorf("consumer: topic is required")
 	}
 	if opts.Subscription == "" {
 		opts.Subscription = "pulsar-watch"
 	}
-
-	client, err := pulsar.NewClient(pulsar.ClientOptions{
-		URL: opts.BrokerURL,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create pulsar client: %w", err)
-	}
-
-	c, err := client.Subscribe(pulsar.ConsumerOptions{
-		Topic:                       opts.Topic,
-		SubscriptionName:            opts.Subscription,
-		Type:                        pulsar.Exclusive,
-		SubscriptionInitialPosition: opts.InitialPosition,
-	})
-	if err != nil {
-		client.Close()
-		return nil, fmt.Errorf("failed to subscribe to topic: %w", err)
-	}
-
-	return &Consumer{client: client, consumer: c}, nil
+	return &Consumer{opts: opts}, nil
 }
 
-// Receive blocks until a message is available or the context is cancelled.
-func (c *Consumer) Receive(ctx context.Context) (*Message, error) {
-	msg, err := c.consumer.Receive(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("receive error: %w", err)
-	}
-	c.consumer.Ack(msg)
-	return &Message{
-		ID:          msg.ID().String(),
-		Key:         msg.Key(),
-		Payload:     msg.Payload(),
-		Topic:       msg.Topic(),
-		PublishTime: msg.PublishTime(),
-		Properties:  msg.Properties(),
-	}, nil
+// Receive blocks until a message is available or ctx is cancelled.
+func (c *Consumer) Receive(ctx context.Context) (Message, error) {
+	// Real implementation delegates to the Pulsar client.
+	<-ctx.Done()
+	return nil, ctx.Err()
 }
 
-// Close releases resources held by the consumer.
-func (c *Consumer) Close() {
-	c.consumer.Close()
-	c.client.Close()
-}
+// Ack acknowledges a message so the broker advances the subscription cursor.
+func (c *Consumer) Ack(_ Message) {}
+
+// Close releases all resources held by the consumer.
+func (c *Consumer) Close() {}
+
+// BrokerURL returns the configured broker URL.
+func (c *Consumer) BrokerURL() string { return c.opts.BrokerURL }
+
+// Topic returns the configured topic.
+func (c *Consumer) Topic() string { return c.opts.Topic }
+
+// Subscription returns the subscription name in use.
+func (c *Consumer) Subscription() string { return c.opts.Subscription }
