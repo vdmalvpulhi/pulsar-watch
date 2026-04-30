@@ -8,78 +8,89 @@ import (
 )
 
 func TestDetect_EmptyPayload(t *testing.T) {
-	if got := schema.Detect([]byte{}); got != schema.FormatText {
-		t.Fatalf("expected FormatText for empty payload, got %v", got)
+	if got := schema.Detect(nil); got != schema.TypeUnknown {
+		t.Fatalf("expected Unknown, got %s", got)
 	}
 }
 
 func TestDetect_WhitespaceOnly(t *testing.T) {
-	if got := schema.Detect([]byte("   \n")); got != schema.FormatText {
-		t.Fatalf("expected FormatText for whitespace, got %v", got)
+	if got := schema.Detect([]byte("   \n")); got != schema.TypeUnknown {
+		t.Fatalf("expected Unknown, got %s", got)
 	}
 }
 
 func TestDetect_ValidJSONObject(t *testing.T) {
-	if got := schema.Detect([]byte(`{"key":"value"}`)); got != schema.FormatJSON {
-		t.Fatalf("expected FormatJSON, got %v", got)
+	payload := []byte(`{"key":"value"}`)
+	if got := schema.Detect(payload); got != schema.TypeJSON {
+		t.Fatalf("expected JSON, got %s", got)
 	}
 }
 
 func TestDetect_ValidJSONArray(t *testing.T) {
-	if got := schema.Detect([]byte(`[1,2,3]`)); got != schema.FormatJSON {
-		t.Fatalf("expected FormatJSON for array, got %v", got)
+	payload := []byte(`[1,2,3]`)
+	if got := schema.Detect(payload); got != schema.TypeJSON {
+		t.Fatalf("expected JSON, got %s", got)
 	}
 }
 
 func TestDetect_InvalidJSON(t *testing.T) {
-	if got := schema.Detect([]byte(`{bad json`)); got != schema.FormatText {
-		t.Fatalf("expected FormatText for invalid json, got %v", got)
+	payload := []byte(`{not valid json}`)
+	if got := schema.Detect(payload); got != schema.TypeText {
+		t.Fatalf("expected Text, got %s", got)
+	}
+}
+
+func TestDetect_XMLPayload(t *testing.T) {
+	payload := []byte(`<root><item>value</item></root>`)
+	if got := schema.Detect(payload); got != schema.TypeXML {
+		t.Fatalf("expected XML, got %s", got)
 	}
 }
 
 func TestDetect_PlainText(t *testing.T) {
-	if got := schema.Detect([]byte("hello world")); got != schema.FormatText {
-		t.Fatalf("expected FormatText for plain text, got %v", got)
+	payload := []byte(`hello world`)
+	if got := schema.Detect(payload); got != schema.TypeText {
+		t.Fatalf("expected Text, got %s", got)
 	}
 }
 
-func TestFormat_String(t *testing.T) {
-	cases := []struct {
-		f    schema.Format
-		want string
-	}{
-		{schema.FormatJSON, "json"},
-		{schema.FormatText, "text"},
-		{schema.FormatUnknown, "unknown"},
-	}
-	for _, tc := range cases {
-		if got := tc.f.String(); got != tc.want {
-			t.Errorf("Format(%d).String() = %q, want %q", tc.f, got, tc.want)
-		}
-	}
-}
-
-func TestPretty_JSONIsIndented(t *testing.T) {
-	payload := []byte(`{"a":1,"b":"hello"}`)
-	out, err := schema.Pretty(payload)
+func TestPretty_JSONIndented(t *testing.T) {
+	payload := []byte(`{"a":1,"b":2}`)
+	out, err := schema.Pretty(payload, schema.TypeJSON)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "\n") {
-		t.Errorf("expected indented JSON to contain newlines, got: %s", out)
+		t.Fatal("expected indented JSON output")
 	}
-	if !strings.Contains(out, "  ") {
-		t.Errorf("expected indented JSON to contain spaces, got: %s", out)
+}
+
+func TestPretty_InvalidJSONReturnsError(t *testing.T) {
+	payload := []byte(`{bad}`)
+	_, err := schema.Pretty(payload, schema.TypeJSON)
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
 	}
 }
 
 func TestPretty_TextPassthrough(t *testing.T) {
-	payload := []byte("simple message")
-	out, err := schema.Pretty(payload)
+	payload := []byte(`hello`)
+	out, err := schema.Pretty(payload, schema.TypeText)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out != "simple message" {
-		t.Errorf("expected passthrough, got: %q", out)
+	if out != "hello" {
+		t.Fatalf("expected passthrough, got %q", out)
+	}
+}
+
+func TestPretty_UnknownPassthrough(t *testing.T) {
+	payload := []byte(`raw bytes`)
+	out, err := schema.Pretty(payload, schema.TypeUnknown)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out != "raw bytes" {
+		t.Fatalf("expected passthrough, got %q", out)
 	}
 }
