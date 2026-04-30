@@ -26,6 +26,7 @@ type Store struct {
 }
 
 // New creates a new Store backed by the given file path.
+// If the file does not yet exist, an empty store is returned without error.
 func New(path string) (*Store, error) {
 	if path == "" {
 		return nil, errors.New("cursor: store path must not be empty")
@@ -61,11 +62,29 @@ func (s *Store) Set(pos Position) error {
 }
 
 // Delete removes the stored position for a topic and persists to disk.
+// If the topic does not exist, Delete is a no-op and returns nil.
 func (s *Store) Delete(topic string) error {
 	s.mu.Lock()
-	delete(s.data, topic)
+	_, exists := s.data[topic]
+	if exists {
+		delete(s.data, topic)
+	}
 	s.mu.Unlock()
+	if !exists {
+		return nil
+	}
 	return s.save()
+}
+
+// Topics returns a slice of all topic names that have a stored position.
+func (s *Store) Topics() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	topics := make([]string, 0, len(s.data))
+	for t := range s.data {
+		topics = append(topics, t)
+	}
+	return topics
 }
 
 func (s *Store) load() error {
