@@ -58,3 +58,22 @@ func TestPrint_KeyInOutput(t *testing.T) {
 		t.Error("expected key 'my-topic' in output")
 	}
 }
+
+// TestPrint_MultipleGroupsAllKeysPresent verifies that all group keys appear
+// in the output when multiple groups are printed.
+func TestPrint_MultipleGroupsAllKeysPresent(t *testing.T) {
+	var buf bytes.Buffer
+	p := NewPrinter(&buf)
+	groups := []Group{
+		{Key: "topic-alpha", Seen: 10, Matched: 5, LastSeen: time.Now()},
+		{Key: "topic-beta", Seen: 20, Matched: 8, LastSeen: time.Now()},
+		{Key: "topic-gamma", Seen: 3, Matched: 1, LastSeen: time.Now()},
+	}
+	p.Print(groups)
+	out := buf.String()
+	for _, key := range []string{"topic-alpha", "topic-beta", "topic-gamma"} {
+		if !strings.Contains(out, key) {
+			t.Errorf("expected key %q in output", key)
+		}
+	}
+}
